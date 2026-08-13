@@ -13,14 +13,3 @@ httpx>=0.27
 python-dotenv>=1.0
 groq>=0.31.0  # Groq's official Python SDK (async + sync clients, OpenAI-compatible)
 
-# --- LSTM emotion classifier deps ---
-# These aren't pinned here because your Colab-trained model already works
-# against whatever keras/tensorflow/nltk versions are in your .venv right
-# now (which wasn't in the zip). Don't blind-upgrade these -- run
-# `pip freeze | grep -iE "keras|tensorflow|nltk|numpy"` in your working
-# venv and paste the exact pinned versions in below, so a fresh install
-# elsewhere matches the environment your model was validated in.
-# keras==<your version>
-# tensorflow==<your version>
-# nltk>=3.8
-# numpy<2  # only if your tensorflow build predates numpy 2 support

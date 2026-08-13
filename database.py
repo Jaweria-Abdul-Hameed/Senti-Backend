@@ -2,9 +2,19 @@ import datetime
 import os
 from typing import List, Optional
 
+from dotenv import load_dotenv
 from sqlalchemy import create_engine, ForeignKey, String, Text, Float, DateTime, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, sessionmaker
 from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.pool import NullPool
+
+# main.py already calls load_dotenv() before importing this module, but this file
+# gets run standalone too (python database.py, seed_db.py, etc.) where nothing else
+# has loaded .env yet. Calling it again here is a no-op if it already ran, so it's
+# safe either way -- this is what was actually causing the "localhost" connection
+# errors: DATABASE_URL was never being read from .env when run standalone, so it
+# silently fell back to the hardcoded default below.
+load_dotenv()
 
 # Same connection string shape as your original database.py, now overridable via env
 # so PyCharm / prod / docker can point it somewhere else without editing code.
@@ -13,7 +23,20 @@ DATABASE_URL = os.getenv(
     "postgresql://postgres:1234@localhost:5432/senti_db",
 )
 
-engine = create_engine(DATABASE_URL, echo=os.getenv("SQL_ECHO", "false").lower() == "true")
+# NullPool: Vercel runs this as a serverless function, so each invocation is a fresh,
+# short-lived process -- there's no long-running app for SQLAlchemy's own connection
+# pool to usefully persist across requests, and stale pooled connections from a
+# previous cold start are a common source of "server closed the connection
+# unexpectedly" errors on serverless. Supabase's pooler (see DATABASE_URL below)
+# already does the real pooling on its side; NullPool just stops SQLAlchemy from
+# doing a redundant, stale-prone second layer of it. pool_pre_ping catches any
+# connection that did go stale before it's handed to a query.
+engine = create_engine(
+    DATABASE_URL,
+    echo=os.getenv("SQL_ECHO", "false").lower() == "true",
+    poolclass=NullPool,
+    pool_pre_ping=True,
+)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
